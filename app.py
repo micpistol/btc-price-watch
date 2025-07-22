@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 import asyncio
 import sqlite3
 import os
@@ -12,6 +13,9 @@ app = FastAPI(
     description="A 24/7 Bitcoin price monitoring service with historical data API",
     version="1.0.0"
 )
+
+# Mount static files for HTML dashboards
+app.mount("/static", StaticFiles(directory="."), name="static")
 
 # Configuration
 DB_PATH = os.getenv("DB_PATH", "./data/btc_price_history.db")
@@ -207,6 +211,21 @@ async def get_stats():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+@app.get("/dashboard")
+async def get_dashboard():
+    """Serve the desktop dashboard"""
+    return FileResponse("dashboard.html")
+
+@app.get("/mobile-dashboard")
+async def get_mobile_dashboard():
+    """Serve the mobile dashboard"""
+    return FileResponse("mobile-dashboard.html")
+
+@app.get("/frontend-example")
+async def get_frontend_example():
+    """Serve the frontend example"""
+    return FileResponse("frontend_example.html")
 
 if __name__ == "__main__":
     import uvicorn
