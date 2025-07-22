@@ -1,0 +1,39 @@
+# fly.toml app configuration file generated for btc-watchdog on 2024-01-01T00:00:00Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = "btc-watchdog"
+primary_region = "ord"
+
+[build]
+
+[env]
+  DB_PATH = "/data/btc_price_history.db"
+  LOG_PATH = "/data/btc_price_log.txt"
+  HEARTBEAT_PATH = "/data/btc_logger_heartbeat.txt"
+  COINBASE_WS_URL = "wss://ws-feed.exchange.coinbase.com"
+  TIMEZONE = "America/New_York"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[mounts]
+  source = "btc_data"
+  destination = "/data"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512 
