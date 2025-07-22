@@ -87,6 +87,27 @@ Get the most recent BTC price.
 }
 ```
 
+#### `GET /price-changes`
+Get price changes over different time periods (1h, 3h, 1d) with percentage changes from Kraken API.
+```json
+{
+  "current_price": 120051.59,
+  "current_timestamp": "2025-07-22T19:31:20",
+  "formatted_current_price": "$120,051.59",
+  "changes": {
+    "1h": {
+      "percentage": 0.12,
+      "direction": "up"
+    },
+    "1d": {
+      "percentage": 2.22,
+      "direction": "up"
+    }
+  },
+  "source": "Kraken API"
+}
+```
+
 #### `GET /prices`
 Query historical price data with optional filters.
 

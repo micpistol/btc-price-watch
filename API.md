@@ -100,6 +100,46 @@ Returns the most recent BTC price from the database.
 }
 ```
 
+### 4. Price Changes
+
+#### `GET /price-changes`
+
+Returns price changes over different time periods (1h, 3h, 1d) with percentage changes from Kraken API and local database.
+
+**Response:**
+```json
+{
+  "current_price": 120051.59,
+  "current_timestamp": "2025-07-22T19:31:20",
+  "formatted_current_price": "$120,051.59",
+  "changes": {
+    "1h": {
+      "percentage": 0.12,
+      "direction": "up"
+    },
+    "1d": {
+      "percentage": 2.22,
+      "direction": "up"
+    }
+  },
+  "source": "Kraken API"
+}
+```
+
+**Change Object Properties:**
+- `percentage`: Percentage change
+- `direction`: `"up"`, `"down"`, or `"unchanged"`
+
+**Note:** 
+- 1h and 3h changes are calculated from local database (when sufficient data is available)
+- 1d change is fetched directly from Kraken API
+- Time periods will only appear if sufficient data is available
+
+**Example:**
+```bash
+curl https://btc-watchdog.fly.dev/price-changes
+```
+
 **Example:**
 ```bash
 curl https://btc-watchdog.fly.dev/latest

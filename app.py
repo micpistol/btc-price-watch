@@ -212,6 +212,124 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
 
+@app.get("/price-changes")
+async def get_price_changes():
+    """Get 1h, 3h, 1d price changes from Kraken API"""
+    try:
+        import httpx
+        
+        # Fetch current price from our database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT timestamp, price FROM price_log 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        ''')
+        current_result = cursor.fetchone()
+        conn.close()
+        
+        if not current_result:
+            return {"message": "No price data available yet"}
+        
+        current_timestamp = current_result[0]
+        current_price = current_result[1]
+        
+        # Fetch percentage changes directly from Kraken API
+        async with httpx.AsyncClient() as client:
+            # Kraken Ticker API for BTC/USD
+            kraken_url = "https://api.kraken.com/0/public/Ticker"
+            params = {"pair": "XBTUSD"}  # Kraken uses XBT for Bitcoin
+            
+            response = await client.get(kraken_url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                
+                if "result" in data and "XXBTZUSD" in data["result"]:
+                    ticker = data["result"]["XXBTZUSD"]
+                    
+                    # Calculate percentage changes from Kraken data
+                    changes = {}
+                    
+                    # 24 hour change (using opening price vs current price)
+                    if "o" in ticker and "c" in ticker:
+                        opening_price = float(ticker["o"])
+                        current_kraken_price = float(ticker["c"][0])
+                        day_change = ((current_kraken_price - opening_price) / opening_price) * 100
+                        changes["1d"] = {
+                            "percentage": round(day_change, 2),
+                            "direction": "up" if day_change > 0 else "down" if day_change < 0 else "unchanged"
+                        }
+                    
+                    # For 1h and 3h, we'll use our own database since Kraken doesn't provide these
+                    # We can calculate from our historical data
+                    from datetime import datetime, timedelta
+                    from zoneinfo import ZoneInfo
+                    
+                    current_dt = datetime.fromisoformat(current_timestamp.replace('Z', '+00:00'))
+                    
+                    # 1 hour ago
+                    one_hour_ago = current_dt - timedelta(hours=1)
+                    conn = sqlite3.connect(DB_PATH)
+                    cursor = conn.cursor()
+                    cursor.execute('''
+                        SELECT price FROM price_log 
+                        WHERE timestamp <= ? 
+                        ORDER BY timestamp DESC 
+                        LIMIT 1
+                    ''', (one_hour_ago.strftime("%Y-%m-%dT%H:%M:%S"),))
+                    one_hour_result = cursor.fetchone()
+                    
+                    if one_hour_result:
+                        one_hour_price = one_hour_result[0]
+                        one_hour_change = current_price - one_hour_price
+                        one_hour_percent = (one_hour_change / one_hour_price) * 100
+                        changes["1h"] = {
+                            "percentage": round(one_hour_percent, 2),
+                            "direction": "up" if one_hour_change > 0 else "down" if one_hour_change < 0 else "unchanged"
+                        }
+                    
+                    # 3 hours ago
+                    three_hours_ago = current_dt - timedelta(hours=3)
+                    cursor.execute('''
+                        SELECT price FROM price_log 
+                        WHERE timestamp <= ? 
+                        ORDER BY timestamp DESC 
+                        LIMIT 1
+                    ''', (three_hours_ago.strftime("%Y-%m-%dT%H:%M:%S"),))
+                    three_hours_result = cursor.fetchone()
+                    
+                    if three_hours_result:
+                        three_hours_price = three_hours_result[0]
+                        three_hours_change = current_price - three_hours_price
+                        three_hours_percent = (three_hours_change / three_hours_price) * 100
+                        changes["3h"] = {
+                            "percentage": round(three_hours_percent, 2),
+                            "direction": "up" if three_hours_change > 0 else "down" if three_hours_change < 0 else "unchanged"
+                        }
+                    
+                    conn.close()
+                    
+                    return {
+                        "current_price": current_price,
+                        "current_timestamp": current_timestamp,
+                        "formatted_current_price": f"${current_price:,.2f}",
+                        "changes": changes,
+                        "source": "Kraken API"
+                    }
+        
+        # Fallback if Kraken API fails
+        return {
+            "current_price": current_price,
+            "current_timestamp": current_timestamp,
+            "formatted_current_price": f"${current_price:,.2f}",
+            "changes": {},
+            "message": "Unable to fetch percentage changes from Kraken"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get price changes: {str(e)}")
+
 @app.get("/dashboard")
 async def get_dashboard():
     """Serve the desktop dashboard"""
