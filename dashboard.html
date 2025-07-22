@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 BTC Price Watchdog Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .price-display {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .current-price {
+            font-size: 3em;
+            font-weight: bold;
+            color: #2ecc71;
+            margin-bottom: 10px;
+        }
+
+        .price-change {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .price-change.positive {
+            color: #27ae60;
+        }
+
+        .price-change.negative {
+            color: #e74c3c;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 10px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .price-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .price-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .price-item:last-child {
+            border-bottom: none;
+        }
+
+        .price-time {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .price-value {
+            font-weight: bold;
+            color: #2ecc71;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .success {
+            color: #27ae60;
+            background: #f0f9f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .current-price {
+                font-size: 2.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 BTC Price Watchdog Dashboard</h1>
+            <p>Real-time Bitcoin price monitoring powered by Fly.io</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div>
+                <span id="lastUpdate">Last update: Never</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Current Price Card -->
+            <div class="card">
+                <h2>💰 Current BTC Price</h2>
+                <div class="price-display">
+                    <div class="current-price" id="currentPrice">Loading...</div>
+                    <div class="price-change" id="priceChange"></div>
+                    <div class="timestamp" id="priceTimestamp"></div>
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="getLatestPrice()">Refresh</button>
+                    <button class="btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Start Auto Refresh</button>
+                </div>
+            </div>
+
+            <!-- Price Chart Card -->
+            <div class="card full-width">
+                <h2>📊 Price Chart (Last 24 Hours)</h2>
+                <div class="controls">
+                    <button class="btn" onclick="loadChartData()">Update Chart</button>
+                    <button class="btn" onclick="loadLast24Hours()">Last 24 Hours</button>
+                    <button class="btn" onclick="loadLastHour()">Last Hour</button>
+                </div>
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Historical Data Card -->
+            <div class="card">
+                <h2>📈 Historical Data</h2>
+                <div class="form-group">
+                    <label for="startDate">Start Date:</label>
+                    <input type="datetime-local" id="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="endDate">End Date:</label>
+                    <input type="datetime-local" id="endDate">
+                </div>
+                <div class="form-group">
+                    <label for="limit">Records:</label>
+                    <select id="limit">
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="getHistoricalData()">Get Data</button>
+                    <button class="btn" onclick="setLast24Hours()">Last 24 Hours</button>
+                </div>
+                <div id="historicalResults" class="price-list"></div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="card">
+                <h2>📊 Statistics</h2>
+                <div class="controls">
+                    <button class="btn" onclick="getStats()">Update Stats</button>
+                </div>
+                <div id="statsResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'https://btc-watchdog.fly.dev';
+        let autoRefreshInterval = null;
+        let priceChart = null;
+        let lastPrice = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            setDefaultDates();
+            checkConnection();
+            getLatestPrice();
+            getStats();
+            loadChartData();
+        });
+
+        // Set default dates
+        function setDefaultDates() {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            
+            document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+            document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
+        }
+
+        // Check API connection
+        async function checkConnection() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDot.classList.remove('offline');
+                    statusText.textContent = `Connected - ${data.status}`;
+                    updateLastUpdate();
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                statusDot.classList.add('offline');
+                statusText.textContent = 'Disconnected';
+                console.error('Connection error:', error);
+            }
+        }
+
+        // Update last update timestamp
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Last update: ${now.toLocaleTimeString()}`;
+        }
+
+        // Get latest price
+        async function getLatestPrice() {
+            const priceDiv = document.getElementById('currentPrice');
+            const changeDiv = document.getElementById('priceChange');
+            const timestampDiv = document.getElementById('priceTimestamp');
+            
+            try {
+                const response = await fetch(`${API_BASE}/latest`);
+                const data = await response.json();
+                
+                if (response.ok && data.price) {
+                    const newPrice = data.price;
+                    priceDiv.textContent = data.formatted_price;
+                    timestampDiv.textContent = `Updated: ${data.timestamp}`;
+                    
+                    // Calculate price change
+                    if (lastPrice !== null) {
+                        const change = newPrice - lastPrice;
+                        const changePercent = (change / lastPrice) * 100;
+                        
+                        if (change > 0) {
+                            changeDiv.textContent = `+$${change.toFixed(2)} (+${changePercent.toFixed(2)}%)`;
+                            changeDiv.className = 'price-change positive';
+                        } else if (change < 0) {
+                            changeDiv.textContent = `-$${Math.abs(change).toFixed(2)} (${changePercent.toFixed(2)}%)`;
+                            changeDiv.className = 'price-change negative';
+                        } else {
+                            changeDiv.textContent = 'No change';
+                            changeDiv.className = 'price-change';
+                        }
+                    }
+                    
+                    lastPrice = newPrice;
+                    updateLastUpdate();
+                } else {
+                    priceDiv.textContent = 'No data available';
+                    changeDiv.textContent = '';
+                    timestampDiv.textContent = '';
+                }
+            } catch (error) {
+                priceDiv.textContent = 'Error loading price';
+                changeDiv.textContent = '';
+                timestampDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+            
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.textContent = 'Start Auto Refresh';
+                btn.classList.remove('active');
+            } else {
+                getLatestPrice();
+                autoRefreshInterval = setInterval(getLatestPrice, 5000); // Refresh every 5 seconds
+                btn.textContent = 'Stop Auto Refresh';
+                btn.classList.add('active');
+            }
+        }
+
+        // Load chart data
+        async function loadChartData() {
+            try {
+                const response = await fetch(`${API_BASE}/prices?limit=100`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    createPriceChart(data.prices.reverse()); // Reverse to show oldest first
+                }
+            } catch (error) {
+                console.error('Error loading chart data:', error);
+            }
+        }
+
+        // Load last 24 hours
+        async function loadLast24Hours() {
+            const end = new Date();
+            const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+            
+            try {
+                const response = await fetch(`${API_BASE}/prices?start=${start.toISOString().slice(0, 19)}&end=${end.toISOString().slice(0, 19)}&limit=1000`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    createPriceChart(data.prices.reverse());
+                }
+            } catch (error) {
+                console.error('Error loading 24h data:', error);
+            }
+        }
+
+        // Load last hour
+        async function loadLastHour() {
+            const end = new Date();
+            const start = new Date(end.getTime() - 60 * 60 * 1000);
+            
+            try {
+                const response = await fetch(`${API_BASE}/prices?start=${start.toISOString().slice(0, 19)}&end=${end.toISOString().slice(0, 19)}&limit=1000`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    createPriceChart(data.prices.reverse());
+                }
+            } catch (error) {
+                console.error('Error loading 1h data:', error);
+            }
+        }
+
+        // Create price chart
+        function createPriceChart(prices) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (priceChart) {
+                priceChart.destroy();
+            }
+            
+            const labels = prices.map(p => new Date(p.timestamp).toLocaleTimeString());
+            const data = prices.map(p => p.price);
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'BTC Price (USD)',
+                        data: data,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Get historical data
+        async function getHistoricalData() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const limit = document.getElementById('limit').value;
+            const resultsDiv = document.getElementById('historicalResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading historical data...</div>';
+                
+                let apiUrl = `${API_BASE}/prices?limit=${limit}`;
+                if (startDate) apiUrl += `&start=${startDate.replace('T', 'T')}:00`;
+                if (endDate) apiUrl += `&end=${endDate.replace('T', 'T')}:00`;
+                
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    let html = `<h3>Found ${data.count} price records:</h3>`;
+                    data.prices.forEach(price => {
+                        html += `
+                            <div class="price-item">
+                                <span class="price-time">${price.timestamp}</span>
+                                <span class="price-value">${price.formatted_price}</span>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">No data found or error occurred</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Set last 24 hours
+        function setLast24Hours() {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            
+            document.getElementById('endDate').value = now.toISOString().slice(0, 16);
+            document.getElementById('startDate').value = yesterday.toISOString().slice(0, 16);
+            getHistoricalData();
+        }
+
+        // Get statistics
+        async function getStats() {
+            const resultsDiv = document.getElementById('statsResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading statistics...</div>';
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let html = `
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">${data.total_records}</div>
+                                <div class="stat-label">Total Records</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.min ? data.price_range.min.toFixed(2) : 'N/A'}</div>
+                                <div class="stat-label">Min Price</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.max ? data.price_range.max.toFixed(2) : 'N/A'}</div>
+                                <div class="stat-label">Max Price</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.average ? data.price_range.average.toFixed(2) : 'N/A'}</div>
+                                <div class="stat-label">Average Price</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px; font-size: 0.9em; color: #666;">
+                            <strong>Date Range:</strong> ${data.date_range.earliest || 'N/A'} to ${data.date_range.latest || 'N/A'}
+                        </div>
+                    `;
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">Failed to load statistics</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Periodic connection check
+        setInterval(checkConnection, 30000); // Check every 30 seconds
+    </script>
+</body>
+</html> 

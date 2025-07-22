@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📱 BTC Price Watchdog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            padding: 15px;
+            max-width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            font-size: 0.9em;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.offline {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .price-display {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .current-price {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2ecc71;
+            margin-bottom: 8px;
+        }
+
+        .price-change {
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+
+        .price-change.positive {
+            color: #27ae60;
+        }
+
+        .price-change.negative {
+            color: #e74c3c;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: transform 0.2s;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: bold;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .price-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 8px;
+        }
+
+        .price-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.9em;
+        }
+
+        .price-item:last-child {
+            border-bottom: none;
+        }
+
+        .price-time {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        .price-value {
+            font-weight: bold;
+            color: #2ecc71;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 15px;
+            font-size: 0.9em;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .success {
+            color: #27ae60;
+            background: #f0f9f0;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 4px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 8px 12px;
+            text-align: center;
+            background: transparent;
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s;
+        }
+
+        .tab.active {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 BTC Price Watchdog</h1>
+            <p>Real-time Bitcoin price monitoring</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div>
+                <span id="lastUpdate">Never</span>
+            </div>
+        </div>
+
+        <!-- Current Price Card -->
+        <div class="card">
+            <h2>💰 Current Price</h2>
+            <div class="price-display">
+                <div class="current-price" id="currentPrice">Loading...</div>
+                <div class="price-change" id="priceChange"></div>
+                <div class="timestamp" id="priceTimestamp"></div>
+            </div>
+            <div class="controls">
+                <button class="btn" onclick="getLatestPrice()">Refresh</button>
+                <button class="btn" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto</button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('stats')">📊 Stats</button>
+            <button class="tab" onclick="showTab('history')">📈 History</button>
+            <button class="tab" onclick="showTab('data')">📋 Data</button>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="statsTab" class="tab-content active">
+            <div class="card">
+                <h2>📊 Statistics</h2>
+                <div class="controls">
+                    <button class="btn" onclick="getStats()">Update</button>
+                </div>
+                <div id="statsResults"></div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="historyTab" class="tab-content">
+            <div class="card">
+                <h2>📈 Quick History</h2>
+                <div class="controls">
+                    <button class="btn" onclick="getRecentPrices()">Recent</button>
+                    <button class="btn" onclick="getLast24Hours()">24h</button>
+                    <button class="btn" onclick="getLastHour()">1h</button>
+                </div>
+                <div id="historyResults" class="price-list"></div>
+            </div>
+        </div>
+
+        <!-- Data Tab -->
+        <div id="dataTab" class="tab-content">
+            <div class="card">
+                <h2>📋 Custom Data</h2>
+                <div class="form-group">
+                    <label for="limit">Records:</label>
+                    <select id="limit">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="getCustomData()">Get Data</button>
+                </div>
+                <div id="customResults" class="price-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'https://btc-watchdog.fly.dev';
+        let autoRefreshInterval = null;
+        let lastPrice = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            checkConnection();
+            getLatestPrice();
+            getStats();
+        });
+
+        // Show tab
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Check API connection
+        async function checkConnection() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDot.classList.remove('offline');
+                    statusText.textContent = `Connected`;
+                    updateLastUpdate();
+                } else {
+                    throw new Error('Health check failed');
+                }
+            } catch (error) {
+                statusDot.classList.add('offline');
+                statusText.textContent = 'Offline';
+                console.error('Connection error:', error);
+            }
+        }
+
+        // Update last update timestamp
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        }
+
+        // Get latest price
+        async function getLatestPrice() {
+            const priceDiv = document.getElementById('currentPrice');
+            const changeDiv = document.getElementById('priceChange');
+            const timestampDiv = document.getElementById('priceTimestamp');
+            
+            try {
+                const response = await fetch(`${API_BASE}/latest`);
+                const data = await response.json();
+                
+                if (response.ok && data.price) {
+                    const newPrice = data.price;
+                    priceDiv.textContent = data.formatted_price;
+                    timestampDiv.textContent = data.timestamp;
+                    
+                    // Calculate price change
+                    if (lastPrice !== null) {
+                        const change = newPrice - lastPrice;
+                        const changePercent = (change / lastPrice) * 100;
+                        
+                        if (change > 0) {
+                            changeDiv.textContent = `+$${change.toFixed(2)} (+${changePercent.toFixed(2)}%)`;
+                            changeDiv.className = 'price-change positive';
+                        } else if (change < 0) {
+                            changeDiv.textContent = `-$${Math.abs(change).toFixed(2)} (${changePercent.toFixed(2)}%)`;
+                            changeDiv.className = 'price-change negative';
+                        } else {
+                            changeDiv.textContent = 'No change';
+                            changeDiv.className = 'price-change';
+                        }
+                    }
+                    
+                    lastPrice = newPrice;
+                    updateLastUpdate();
+                } else {
+                    priceDiv.textContent = 'No data';
+                    changeDiv.textContent = '';
+                    timestampDiv.textContent = '';
+                }
+            } catch (error) {
+                priceDiv.textContent = 'Error';
+                changeDiv.textContent = '';
+                timestampDiv.textContent = error.message;
+            }
+        }
+
+        // Toggle auto refresh
+        function toggleAutoRefresh() {
+            const btn = document.getElementById('autoRefreshBtn');
+            
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+                btn.textContent = 'Auto';
+                btn.classList.remove('active');
+            } else {
+                getLatestPrice();
+                autoRefreshInterval = setInterval(getLatestPrice, 5000);
+                btn.textContent = 'Stop';
+                btn.classList.add('active');
+            }
+        }
+
+        // Get statistics
+        async function getStats() {
+            const resultsDiv = document.getElementById('statsResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading...</div>';
+                const response = await fetch(`${API_BASE}/stats`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let html = `
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">${data.total_records}</div>
+                                <div class="stat-label">Records</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.min ? data.price_range.min.toFixed(0) : 'N/A'}</div>
+                                <div class="stat-label">Min</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.max ? data.price_range.max.toFixed(0) : 'N/A'}</div>
+                                <div class="stat-label">Max</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">$${data.price_range.average ? data.price_range.average.toFixed(0) : 'N/A'}</div>
+                                <div class="stat-label">Avg</div>
+                            </div>
+                        </div>
+                    `;
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">Failed to load</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Get recent prices
+        async function getRecentPrices() {
+            const resultsDiv = document.getElementById('historyResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading...</div>';
+                const response = await fetch(`${API_BASE}/prices?limit=20`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    let html = '';
+                    data.prices.forEach(price => {
+                        html += `
+                            <div class="price-item">
+                                <span class="price-time">${price.timestamp}</span>
+                                <span class="price-value">${price.formatted_price}</span>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">No data found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Get last 24 hours
+        async function getLast24Hours() {
+            const resultsDiv = document.getElementById('historyResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading...</div>';
+                const end = new Date();
+                const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+                
+                const response = await fetch(`${API_BASE}/prices?start=${start.toISOString().slice(0, 19)}&end=${end.toISOString().slice(0, 19)}&limit=50`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    let html = '';
+                    data.prices.forEach(price => {
+                        html += `
+                            <div class="price-item">
+                                <span class="price-time">${price.timestamp}</span>
+                                <span class="price-value">${price.formatted_price}</span>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">No data found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Get last hour
+        async function getLastHour() {
+            const resultsDiv = document.getElementById('historyResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading...</div>';
+                const end = new Date();
+                const start = new Date(end.getTime() - 60 * 60 * 1000);
+                
+                const response = await fetch(`${API_BASE}/prices?start=${start.toISOString().slice(0, 19)}&end=${end.toISOString().slice(0, 19)}&limit=50`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    let html = '';
+                    data.prices.forEach(price => {
+                        html += `
+                            <div class="price-item">
+                                <span class="price-time">${price.timestamp}</span>
+                                <span class="price-value">${price.formatted_price}</span>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">No data found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Get custom data
+        async function getCustomData() {
+            const limit = document.getElementById('limit').value;
+            const resultsDiv = document.getElementById('customResults');
+            
+            try {
+                resultsDiv.innerHTML = '<div class="loading">Loading...</div>';
+                const response = await fetch(`${API_BASE}/prices?limit=${limit}`);
+                const data = await response.json();
+                
+                if (response.ok && data.prices) {
+                    let html = '';
+                    data.prices.forEach(price => {
+                        html += `
+                            <div class="price-item">
+                                <span class="price-time">${price.timestamp}</span>
+                                <span class="price-value">${price.formatted_price}</span>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<div class="error">No data found</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Periodic connection check
+        setInterval(checkConnection, 30000);
+    </script>
+</body>
+</html> 
